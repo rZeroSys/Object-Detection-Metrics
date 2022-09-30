@@ -398,6 +398,12 @@ for metricsPerClass in detections:
     totalPositives = metricsPerClass['total positives']
     total_TP = metricsPerClass['total TP']
     total_FP = metricsPerClass['total FP']
+    total_FN = metricsPerClass['total positives'] - metricsPerClass['total TP']
+    fhalf = metricsPerClass['fh']
+    f1 = metricsPerClass['f1']
+    f2 = metricsPerClass['f2']
+    f4 = metricsPerClass['f4']
+    f8 = metricsPerClass['f8']
 
     if totalPositives > 0:
         validClasses = validClasses + 1
@@ -411,8 +417,19 @@ for metricsPerClass in detections:
         f.write('\nAP: %s' % ap_str)
         f.write('\nPrecision: %s' % prec)
         f.write('\nRecall: %s' % rec)
+        f.write(f'\nFN: {total_FN}')
+        f.write('\nFh: %s' % fhalf)
+        f.write('\nF1: %s' % f1)
+        f.write('\nF2: %s' % f2)
+        f.write('\nF4: %s' % f4)
+        f.write('\nF8: %s' % f8)
 
 mAP = acc_AP / validClasses
 mAP_str = "{0:.2f}%".format(mAP * 100)
 print('mAP: %s' % mAP_str)
 f.write('\n\n\nmAP: %s' % mAP_str)
+print(f'Fh: {fhalf:.4f}')
+print(f'F1: {f1:.4f}')
+print(f'F2: {f2:.4f}')
+print(f'F4: {f4:.4f}')
+print(f'F8: {f8:.4f}')
