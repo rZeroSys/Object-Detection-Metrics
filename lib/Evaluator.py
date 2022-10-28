@@ -24,7 +24,8 @@ class Evaluator:
     def GetPascalVOCMetrics(self,
                             boundingboxes,
                             IOUThreshold=0.5,
-                            method=MethodAveragePrecision.EveryPointInterpolation):
+                            method=MethodAveragePrecision.EveryPointInterpolation,
+                            savePath=None,):
         """Get the metrics used by the VOC Pascal 2012 challenge.
         Get
         Args:
@@ -128,11 +129,13 @@ class Evaluator:
             acc_TP = np.cumsum(TP)
             rec = acc_TP / npos
             prec = np.divide(acc_TP, (acc_FP + acc_TP))
+            confidences = [d[2] for d in dects]
             # Depending on the method, call the right implementation
             if method == MethodAveragePrecision.EveryPointInterpolation:
                 [ap, mpre, mrec, ii] = Evaluator.CalculateAveragePrecision(rec, prec)
             else:
                 [ap, mpre, mrec, _] = Evaluator.ElevenPointInterpolatedAP(rec, prec)
+            fh, f1, f2, f4, f8 = Evaluator.CalculateFScores(rec, prec, savePath=savePath, confidences=confidences)
             # add class result in the dictionary to be returned
             r = {
                 'class': c,
@@ -143,7 +146,12 @@ class Evaluator:
                 'interpolated recall': mrec,
                 'total positives': npos,
                 'total TP': np.sum(TP),
-                'total FP': np.sum(FP)
+                'total FP': np.sum(FP),
+                'fh': fh,
+                'f1': f1,
+                'f2': f2,
+                'f4': f4,
+                'f8': f8,
             }
             ret.append(r)
         return ret
@@ -187,7 +195,7 @@ class Evaluator:
             dict['total TP']: total number of True Positive detections;
             dict['total FP']: total number of False Negative detections;
         """
-        results = self.GetPascalVOCMetrics(boundingBoxes, IOUThreshold, method)
+        results = self.GetPascalVOCMetrics(boundingBoxes, IOUThreshold, method, savePath=savePath)
         result = None
         # Each resut represents a class
         for result in results:
@@ -312,6 +320,37 @@ class Evaluator:
             ap = ap + np.sum((mrec[i] - mrec[i - 1]) * mpre[i])
         # return [ap, mpre[1:len(mpre)-1], mrec[1:len(mpre)-1], ii]
         return [ap, mpre[0:len(mpre) - 1], mrec[0:len(mpre) - 1], ii]
+
+    @staticmethod
+    def CalculateFScores(rec, prec, savePath=None, confidences=None):
+        def f_beta(recall_value, precision_value, beta_value=1):
+            denom = beta_value ** 2 * precision_value + recall_value
+            if denom == 0.0:
+                denom = 1.
+            return (1 + beta_value ** 2) * (precision_value * recall_value) / denom
+        fhs, f1s, f2s, f4s, f8s = [], [], [], [], []
+        for recall, precision in zip(rec, prec):
+
+            fhs.append(f_beta(recall, precision, beta_value=0.5))
+            f1s.append(f_beta(recall, precision))
+            f2s.append(f_beta(recall, precision, beta_value=2))
+            f4s.append(f_beta(recall, precision, beta_value=4))
+            f8s.append(f_beta(recall, precision, beta_value=8))
+
+        if savePath is not None:
+            plt.close()
+            plt.plot(confidences, fhs, label='F_half')
+            plt.plot(confidences, f1s, label='F_1')
+            plt.plot(confidences, f2s, label='F_2')
+            plt.plot(confidences, f4s, label='F_4')
+            plt.plot(confidences, f8s, label='F_8')
+            plt.legend(["F_1/2", "F_1", "F_2", "F_4", "F_8"])
+            plt.xlabel('threshold')
+            plt.ylabel('F_score')
+            plt.savefig(os.path.join(savePath, 'f_scores_plot.png'))
+            plt.close()
+
+        return [np.max(fhs), np.max(f1s), np.max(f2s), np.max(f4s), np.max(f8s)]
 
     @staticmethod
     # 11-point interpolated average precision
